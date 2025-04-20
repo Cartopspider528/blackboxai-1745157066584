@@ -1,0 +1,22 @@
+{
+  "package.json": {
+    "name": "stonks-app",
+    "version": "1.0.0",
+    "private": true,
+    "dependencies": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0",
+      "react-scripts": "5.0.1",
+      "react-apexcharts": "^1.7.0",
+      "apexcharts": "^4.0.0"
+    },
+    "scripts": {
+      "start": "react-scripts start",
+      "build": "react-scripts build",
+      "test": "react-scripts test",
+      "eject": "react-scripts eject"
+    }
+  },
+  "src/App.js": "import { useEffect, useState, useMemo } from 'react';\nimport Chart from 'react-apexcharts';\n\nconst ALPHA_VANTAGE_API_KEY = '9L4HUWC0NFG3NQ6S';\nconst symbol = 'AAPL'; // Default stock symbol, can be changed to any global stock symbol\nconst interval = '5min'; // Interval for time series data\n\nasync function getStockData() {\n  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=${interval}&apikey=${ALPHA_VANTAGE_API_KEY}&outputsize=compact`;\n  const response = await fetch(url);\n  return response.json();\n}\n\nconst directionEmojis = {\n  up: '🚀',\n  down: '💩',\n  '': '',\n};\n\nconst chartOptions = {\n  chart: {\n    type: 'candlestick',\n    height: 350,\n  },\n  title: {\n    text: 'CandleStick Chart',\n    align: 'left',\n  },\n  xaxis: {\n    type: 'datetime',\n  },\n  yaxis: {\n    tooltip: {\n      enabled: true,\n    },\n  },\n};\n\nconst round = (number) => {\n  return number ? +(parseFloat(number).toFixed(2)) : null;\n};\n\nfunction App() {\n  const [series, setSeries] = useState([{ data: [] }]);\n  const [price, setPrice] = useState(-1);\n  const [prevPrice, setPrevPrice] = useState(-1);\n  const [priceTime, setPriceTime] = useState(null);\n\n  useEffect(() => {\n    let timeoutId;\n\n    async function getLatestPrice() {\n      try {\n        const data = await getStockData();\n        const timeSeriesKey = `Time Series (${interval})`;\n        const timeSeries = data[timeSeriesKey];\n        if (!timeSeries) {\n          console.error('Invalid data format or API limit reached', data);\n          return;\n        }\n\n        const timestamps = Object.keys(timeSeries).sort((a, b) => new Date(a) - new Date(b));\n\n        const prices = timestamps.map((timestamp) => {\n          const candle = timeSeries[timestamp];\n          return {\n            x: new Date(timestamp),\n            y: [\n              round(candle['1. open']),\n              round(candle['2. high']),\n              round(candle['3. low']),\n              round(candle['4. close']),\n            ],\n          };\n        });\n\n        const latestTimestamp = timestamps[timestamps.length - 1];\n        const latestCandle = timeSeries[latestTimestamp];\n        setPrevPrice(price);\n        setPrice(round(latestCandle['4. close']));\n        setPriceTime(new Date(latestTimestamp));\n\n        setSeries([{ data: prices }]);\n      } catch (error) {\n        console.error(error);\n      }\n      timeoutId = setTimeout(getLatestPrice, 10000);\n    }\n\n    getLatestPrice();\n\n    return () => {\n      clearTimeout(timeoutId);\n    };\n  }, [price]);\n\n  const direction = useMemo(() => (prevPrice < price ? 'up' : prevPrice > price ? 'down' : ''), [prevPrice, price]);\n\n  return (\n    <div className=\"container mx-auto p-4 font-sans\">\n      <div className=\"warning text-red-600 font-bold mb-2\">\n        FOR ENTERTAINMENT PURPOSES ONLY!<br />\n        DO NOT USE THIS SITE AS FINANCIAL ADVICE!\n      </div>\n      <div className=\"ticker text-3xl font-extrabold mb-2\">{symbol}</div>\n      <div className={`price text-4xl font-bold mb-2 ${direction}`}>\n        ${price} {directionEmojis[direction]}\n      </div>\n      <div className=\"price-time text-gray-600 mb-4\">{priceTime && priceTime.toLocaleTimeString()}</div>\n      <Chart options={chartOptions} series={series} type=\"candlestick\" width=\"100%\" height={320} />\n    </div>\n  );\n}\n\nexport default App;\n",
+  "src/index.js": "import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nconst root = ReactDOM.createRoot(document.getElementById('root'));\nroot.render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n"
+}
